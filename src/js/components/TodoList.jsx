@@ -6,20 +6,17 @@ function TodoList() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    
-    const englishInitialTasks = [
-        "Walk the dog",
-        "Go to the gym",
-        "Study for the exam",
-    ];
+    const API_URL = "https://playground.4geeks.com/todo/users/Garset";
 
-   
+    
     useEffect(() => {
-        
-        new Promise(resolve => setTimeout(resolve, 1000))
-            .then(() => {
-                
-                setTasks(englishInitialTasks);
+        fetch(API_URL)
+            .then(response => {
+                if (!response.ok) throw new Error("Failed");
+                return response.json();
+            })
+            .then(data => {
+                setTasks(data.todos);  
                 setLoading(false);
             })
             .catch(err => {
@@ -32,13 +29,25 @@ function TodoList() {
         setNewTask(event.target.value);
     }
 
+    
     function addTask() {
         if (newTask.trim() !== "") {
-           
-            new Promise(resolve => setTimeout(resolve, 500))
-                .then(() => {
-                    
-                    setTasks(t => [...t, newTask]);
+            fetch(API_URL, {
+                method: "POST",
+                body: JSON.stringify({
+                    task: newTask,  
+                    is_done: false,
+                }),
+                headers: {
+                    "Content-type": "application/json",
+                },
+            })
+                .then(response => {
+                    if (!response.ok) throw new Error("Failed to add task");
+                    return response.json();
+                })
+                .then(data => {
+                    setTasks([...tasks, data]);  
                     setNewTask("");
                 })
                 .catch(err => {
@@ -47,12 +56,14 @@ function TodoList() {
         }
     }
 
-    function deleteTask(index) {
-        
-        new Promise(resolve => setTimeout(resolve, 300))
-            .then(() => {
-                
-                const updatedTasks = tasks.filter((_, i) => i !== index);
+    
+    function deleteTask(taskId) {  
+        fetch(`${API_URL}/${taskId}`, {
+            method: "DELETE",
+        })
+            .then(response => {
+                if (!response.ok) throw new Error("Failed to delete task");
+                const updatedTasks = tasks.filter(task => task.id !== taskId);
                 setTasks(updatedTasks);
             })
             .catch(err => {
@@ -60,37 +71,20 @@ function TodoList() {
             });
     }
 
+   
     function moveTaskUp(index) {
         if (index > 0) {
             const updatedTasks = [...tasks];
-            [updatedTasks[index], updatedTasks[index - 1]] = 
-            [updatedTasks[index - 1], updatedTasks[index]];
-            
-           
-            new Promise(resolve => setTimeout(resolve, 300))
-                .then(() => {
-                    setTasks(updatedTasks);
-                })
-                .catch(err => {
-                    setError(err.message);
-                });
+            [updatedTasks[index], updatedTasks[index - 1]] = [updatedTasks[index - 1], updatedTasks[index]];
+            setTasks(updatedTasks);
         }
     }
 
     function moveTaskDown(index) {
         if (index < tasks.length - 1) {
             const updatedTasks = [...tasks];
-            [updatedTasks[index], updatedTasks[index + 1]] = 
-            [updatedTasks[index + 1], updatedTasks[index]];
-            
-            
-            new Promise(resolve => setTimeout(resolve, 300))
-                .then(() => {
-                    setTasks(updatedTasks);
-                })
-                .catch(err => {
-                    setError(err.message);
-                });
+            [updatedTasks[index], updatedTasks[index + 1]] = [updatedTasks[index + 1], updatedTasks[index]];
+            setTasks(updatedTasks);
         }
     }
 
@@ -99,45 +93,33 @@ function TodoList() {
 
     return (
         <div className="to-do-list">
-            <h1>To-Do List</h1>
+            <h1>Garset TodoList react + fetch</h1>
             <div>
                 <input 
                     type="text" 
-                    placeholder="Enter a task in English..." 
+                    placeholder="Enter a task..." 
                     value={newTask} 
                     onChange={handleInputChange}
                 />
-                <button 
-                    className="add-button"
-                    onClick={addTask}
-                >
+                <button className="add-button" onClick={addTask}>
                     Add
                 </button> 
             </div>
             <ol>
-                {tasks.map((task, index) => 
-                    <li key={index}>
-                        <span className="text">{task}</span>
-                        <button
-                            className="delete-button"
-                            onClick={() => deleteTask(index)}
-                        >
+                {tasks.map((task, index) => (
+                    <li key={task.id}>  
+                        <span className="text">{task.task}</span>  
+                        <button className="delete-button" onClick={() => deleteTask(task.id)}>
                             Delete
                         </button>
-                        <button
-                            className="move-button"
-                            onClick={() => moveTaskUp(index)}
-                        >
+                        <button className="move-button" onClick={() => moveTaskUp(index)}>
                             ↑
                         </button>
-                        <button
-                            className="move-button"
-                            onClick={() => moveTaskDown(index)}
-                        >
+                        <button className="move-button" onClick={() => moveTaskDown(index)}>
                             ↓
                         </button>
                     </li>
-                )}
+                ))}
             </ol>
         </div>
     );

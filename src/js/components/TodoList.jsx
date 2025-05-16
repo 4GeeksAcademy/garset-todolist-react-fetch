@@ -34,6 +34,88 @@ function TodoList() {
             });
     }
 
+    useEffect(() => {
+        fetch(API_URL)
+            .then(response => {
+                if (!response.ok) throw new Error("Failed to fetch tasks");
+                return response.json();
+            })
+            .then(data => {
+                setTasks(data.todos); 
+                setLoading(false);
+            })
+            .catch(err => {
+                setError(err.message);
+                setLoading(false);
+            });
+    }, []);
+
+    function handleInputChange(event) {
+        setNewTask(event.target.value);
+    }
+
+   
+    function addTask() {
+        if (newTask.trim() !== "") {
+            fetch(API_URL, {
+                method: "POST",
+                body: JSON.stringify({
+                    task: newTask,  
+                    is_done: false,
+                }),
+                headers: {
+                    "Content-type": "application/json",
+                },
+            })
+                .then(response => {
+                    if (!response.ok) throw new Error("Failed to add task");
+                    return response.json();
+                })
+                .then(data => {
+                    setTasks([...tasks, data]);  
+                    setNewTask("");
+                })
+                .catch(err => {
+                    setError(err.message);
+                });
+        }
+    }
+
+    
+    function deleteTask(taskId) {  
+        fetch(`${API_URL}/${taskId}`, {
+            method: "DELETE",
+        })
+            .then(response => {
+                if (!response.ok) throw new Error("Failed to delete task");
+                const updatedTasks = tasks.filter(task => task.id !== taskId);
+                setTasks(updatedTasks);
+            })
+            .catch(err => {
+                setError(err.message);
+            });
+    }
+
+    
+    function moveTaskUp(index) {
+        if (index > 0) {
+            const updatedTasks = [...tasks];
+            [updatedTasks[index], updatedTasks[index - 1]] = [updatedTasks[index - 1], updatedTasks[index]];
+            setTasks(updatedTasks);
+        }
+    }
+
+    function moveTaskDown(index) {
+        if (index < tasks.length - 1) {
+            const updatedTasks = [...tasks];
+            [updatedTasks[index], updatedTasks[index + 1]] = [updatedTasks[index + 1], updatedTasks[index]];
+            setTasks(updatedTasks);
+        }
+    }
+
+    if (loading) return <div>Loading tasks...</div>;
+    if (error) return <div>Error: {error}</div>;
+
     return (
         <div className="to-do-list">
             
@@ -44,7 +126,7 @@ function TodoList() {
                 {showUserForm ? "Cancel" : "Create New User"}
             </button>
 
-            {/* Formulario para crear usuario (condicional) */}
+           
             {showUserForm && (
                 <div className="user-form">
                     <input

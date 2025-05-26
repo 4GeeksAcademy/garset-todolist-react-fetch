@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 
 function TodoList() {
@@ -5,11 +6,10 @@ function TodoList() {
     const [newTask, setNewTask] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [username, setUsername] = useState(""); 
-    const [showUserForm, setShowUserForm] = useState(false); 
+    const [username, setUsername] = useState("");
+    const [currentUser, setCurrentUser] = useState(null);
 
-    const API_URL = "https://playground.4geeks.com/todo/users/Garset"; 
-
+    const API_BASE = "https://playground.4geeks.com/todo";
 
     function createUser() {
         if (username.trim() === "") {
@@ -17,100 +17,100 @@ function TodoList() {
             return;
         }
         
-        fetch("https://playground.4geeks.com/todo/users/" + username, {
+        fetch(`${API_BASE}/users/${username}`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
             },
+           
         })
-            .then(response => {
-                if (!response.ok) throw new Error("Failed to create user");
-                alert(`User "${username}" created successfully!`);
-                setUsername("");
-                setShowUserForm(false);
-            })
-            .catch(err => {
-                setError(err.message);
-            });
+        .then(response => {
+           
+            if (response.status === 400) {loadUserTasks(username)};
+            return response.json();
+        })
+        .then(() => {
+            setCurrentUser(username);
+            console.log (currentUser);
+            setUsername("");
+            loadUserTasks(username);
+        })
+        .catch(err => {
+            setError(err.message);
+            console.error("Error creating user:", err);
+        });
+    }
+
+    function loadUserTasks(username) {
+        setLoading(true);
+        fetch(`${API_BASE}/users/${username}`)
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            setTasks(data.todos || []);
+            setLoading(false);
+        })
+        .catch(err => {
+            setError(err.message);
+            setLoading(false);
+            console.error("Error loading tasks:", err);
+        });
     }
 
     useEffect(() => {
-        fetch(API_URL)
-            .then(response => {
-                if (!response.ok) throw new Error("Failed to fetch tasks");
-                return response.json();
-            })
-            .then(data => {
-                setTasks(data.todos); 
-                setLoading(false);
-            })
-            .catch(err => {
-                setError(err.message);
-                setLoading(false);
-            });
-    }, []);
+        if (currentUser) {
+            loadUserTasks(currentUser);
+        } else {
+            setLoading(false);
+        }
+    }, [currentUser]);
 
     function handleInputChange(event) {
         setNewTask(event.target.value);
     }
 
-   
     function addTask() {
-        if (newTask.trim() !== "") {
-            fetch(API_URL, {
-                method: "POST",
-                body: JSON.stringify({
-                    task: newTask,  
-                    is_done: false,
-                }),
-                headers: {
-                    "Content-type": "application/json",
-                },
-            })
-                .then(response => {
-                    if (!response.ok) throw new Error("Failed to add task");
-                    return response.json();
-                })
-                .then(data => {
-                    setTasks([...tasks, data]);  
-                    setNewTask("");
-                })
-                .catch(err => {
-                    setError(err.message);
-                });
-        }
+        if (newTask.trim() === "" || !currentUser) return;
+
+        fetch(`${API_BASE}/todos/${currentUser}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                label: newTask,
+                is_done: false,
+                id: 0,
+            }),
+        })
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return response.json();
+        })
+        .then(newTaskData => {
+            setTasks([...tasks, newTaskData]);
+            setNewTask("");
+        })
+        .catch(err => {
+            setError(err.message);
+            console.error("Error adding task:", err);
+        });
     }
 
-    
-    function deleteTask(taskId) {  
-        fetch(`${API_URL}/${taskId}`, {
+    function deleteTask(taskId) {
+        fetch(`${API_BASE}/todos/${taskId}`, {
             method: "DELETE",
         })
-            .then(response => {
-                if (!response.ok) throw new Error("Failed to delete task");
-                const updatedTasks = tasks.filter(task => task.id !== taskId);
-                setTasks(updatedTasks);
-            })
-            .catch(err => {
-                setError(err.message);
-            });
-    }
-
-    
-    function moveTaskUp(index) {
-        if (index > 0) {
-            const updatedTasks = [...tasks];
-            [updatedTasks[index], updatedTasks[index - 1]] = [updatedTasks[index - 1], updatedTasks[index]];
-            setTasks(updatedTasks);
-        }
-    }
-
-    function moveTaskDown(index) {
-        if (index < tasks.length - 1) {
-            const updatedTasks = [...tasks];
-            [updatedTasks[index], updatedTasks[index + 1]] = [updatedTasks[index + 1], updatedTasks[index]];
-            setTasks(updatedTasks);
-        }
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            setTasks(tasks.filter(task => task.id !== taskId));
+        })
+        .catch(err => {
+            setError(err.message);
+            console.error("Error deleting task:", err);
+        });
     }
 
     if (loading) return <div>Loading tasks...</div>;
@@ -118,55 +118,50 @@ function TodoList() {
 
     return (
         <div className="to-do-list">
-            
-            <button 
-                className="user-button" 
-                onClick={() => setShowUserForm(!showUserForm)}
-            >
-                {showUserForm ? "Cancel" : "Create New User"}
-            </button>
-
-           
-            {showUserForm && (
-                <div className="user-form">
-                    <input
-                        type="text"
-                        placeholder="Enter username"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                    />
-                    <button onClick={createUser}>Create User</button>
+            {!currentUser ? (
+                <div className="user-section">
+                    <h2>Create or Select User</h2>
+                    <div className="user-form">
+                        <input
+                            type="text"
+                            placeholder="Enter username"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                        />
+                        <button onClick={createUser}>Create/Login User</button>
+                    </div>
                 </div>
-            )}
+            ) : (
+                <>
+                    <div className="user-info">
+                        <h2>Current User: {currentUser}</h2>
+                        <button onClick={() => setCurrentUser(null)}>Change User</button>
+                    </div>
 
-            <h1>Garset TodoList react + fetch</h1>
-            <div>
-                <input 
-                    type="text" 
-                    placeholder="Enter a task..." 
-                    value={newTask} 
-                    onChange={handleInputChange}
-                />
-                <button className="add-button" onClick={addTask}>
-                    Add
-                </button> 
-            </div>
-            <ol>
-                {tasks.map((task, index) => (
-                    <li key={task.id}>  
-                        <span className="text">{task.task}</span>  
-                        <button className="delete-button" onClick={() => deleteTask(task.id)}>
-                            Delete
-                        </button>
-                        <button className="move-button" onClick={() => moveTaskUp(index)}>
-                            Up
-                        </button>
-                        <button className="move-button" onClick={() => moveTaskDown(index)}>
-                            Down
-                        </button>
-                    </li>
-                ))}
-            </ol>
+                    <h1>Todo List</h1>
+                    <div className="task-input">
+                        <input 
+                            type="text" 
+                            placeholder="Enter a task..." 
+                            value={newTask} 
+                            onChange={handleInputChange}
+                        />
+                        <button className="add-button" onClick={addTask}>
+                            Add
+                        </button> 
+                    </div>
+                    <ol>
+                        {tasks.map((task) => (
+                            <li key={task.id}>
+                                <span className="text">{task.label}</span>
+                                <button className="delete-button" onClick={() => deleteTask(task.id)}>
+                                    Delete
+                                </button>
+                            </li>
+                        ))}
+                    </ol>
+                </>
+            )}
         </div>
     );
 }
